@@ -41,15 +41,40 @@ const photos = {
 };
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+let accessToken: string | null = null;
+let accessTokenExpiresAt = 0;
+
+async function refreshAccessToken(): Promise<void> {
+  const response = await fetch(`${apiBaseUrl}/api/token`, {
+    credentials: "include",
+  });
+  const payload = (await response.json()) as { token?: string; expiresIn?: number; message?: string };
+  if (!response.ok || !payload.token || !payload.expiresIn) {
+    throw new Error(payload.message || "Could not obtain an access token. Please sign in again.");
+  }
+  accessToken = payload.token;
+  accessTokenExpiresAt = Date.now() + payload.expiresIn * 1000;
+}
 
 async function apiRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
+  if (
+    accessToken &&
+    accessTokenExpiresAt <= Date.now() + 30_000 &&
+    path !== "/api/token" &&
+    !path.startsWith("/api/auth/")
+  ) {
+    await refreshAccessToken();
+  }
+
+  const headers = new Headers(options.headers);
+  if (!headers.has("Content-Type")) headers.set("Content-Type", "application/json");
+  if (accessToken && !path.startsWith("/api/auth/")) {
+    headers.set("Authorization", `Bearer ${accessToken}`);
+  }
   const response = await fetch(`${apiBaseUrl}${path}`, {
     ...options,
     credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      ...options.headers,
-    },
+    headers,
   });
   const body = await response.text();
   const payload: unknown = body ? JSON.parse(body) : undefined;
@@ -279,6 +304,7 @@ export function CommunityApp({ view, eventId }: { view: View; eventId?: string }
         const currentUser = session?.user ? toUser(session.user) : null;
         setUser(currentUser);
         if (currentUser) {
+          await refreshAccessToken();
           setJoined(await apiRequest<string[]>("/api/events/joined"));
         }
       } catch (error) {
@@ -415,6 +441,7 @@ export function CommunityApp({ view, eventId }: { view: View; eventId?: string }
         method: "POST",
         body: JSON.stringify(credentials),
       });
+      await refreshAccessToken();
       setUser(toUser(result.user));
       setNotice(registering ? "Welcome to Commonplace. Your profile is ready!" : "Welcome back. Let’s do some good.");
       router.push("/events");
@@ -439,6 +466,8 @@ export function CommunityApp({ view, eventId }: { view: View; eventId?: string }
   async function logout() {
     try {
       await apiRequest<void>("/api/auth/sign-out", { method: "POST" });
+      accessToken = null;
+      accessTokenExpiresAt = 0;
       setUser(null);
       setJoined([]);
       setMenuOpen(false);
@@ -565,13 +594,6 @@ function HomePage({ events }: { events: EventItem[] }) {
       <div className="gallery-grid"><div className="gallery-photo gallery-large" style={pictureStyle(photos.community)} /><div className="gallery-photo" style={pictureStyle(photos.garden)} /><div className="gallery-quote"><span>“</span><p>The best thing about doing good? Finding out how many people wanted to do it with you.</p><small>— A neighbor in Dhaka</small></div><div className="gallery-photo" style={pictureStyle(photos.children)} /></div>
     </section>
 
-    <section className="newsletter-section page-width">
-      <div className="newsletter-mark"><Icon name="leaf" size={27} /></div>
-      <div className="newsletter-copy"><span className="eyebrow">A LITTLE GOOD IN YOUR INBOX</span><h2>Stay close to the good stuff.</h2><p>Local happenings, kind people, and small ways to pitch in. Never noise.</p></div>
-      <form className="newsletter-form" onSubmit={(event) => { event.preventDefault(); window.dispatchEvent(new CustomEvent("commonplace-toast", { detail: "You’re on the list. Look out for a little good in your inbox!" })); }}>
-        <label className="sr-only" htmlFor="newsletter-email">Your email address</label><input id="newsletter-email" name="email" type="email" required placeholder="Your email address" /><button aria-label="Subscribe"><Icon name="arrow" size={19} /></button><small>THE OCCASIONAL GOOD THING. UNSUBSCRIBE ANYTIME.</small>
-      </form>
-    </section>
   </>;
 }
 
@@ -648,17 +670,10 @@ function AuthPage({ registering, onSubmit, onSocial }: { registering: boolean; o
 }
 
 function Footer() {
-  const [notice, setNotice] = useState("");
-  useEffect(() => {
-    const handler = (event: Event) => setNotice((event as CustomEvent<string>).detail);
-    window.addEventListener("commonplace-toast", handler);
-    return () => window.removeEventListener("commonplace-toast", handler);
-  }, []);
   return <>
     <footer className="site-footer"><div className="page-width">
       <div className="footer-main"><div className="footer-brand"><Link className="brand brand-footer" href="/"><span className="brand-mark"><Icon name="leaf" size={20} /></span><span>commonplace<span className="brand-period">.</span><small>GOOD THINGS GROW HERE</small></span></Link><p>Making it easier to show up<br />for the places we call home.</p></div><div className="footer-links"><div><span>FIND YOUR GOOD</span><Link href="/events">Upcoming events</Link><Link href="/create-event">Create an event</Link><Link href="/joined-events">Joined events</Link></div><div><span>THE NEIGHBORHOOD</span><Link href="/#our-way">Our way</Link><a href="mailto:hello@commonplace.community">Say hello</a><a href="https://x.com" target="_blank" rel="noreferrer">Follow along on X ↗</a></div></div><div className="footer-sticker"><span>✳</span><p>Be the reason<br />someone smiles<br />this week.</p></div></div>
       <div className="footer-bottom"><span>© Commonplace. Made for the good of it.</span><span>GOOD IS CLOSER THAN YOU THINK.</span><Link href="/">Back to top ↑</Link></div>
     </div></footer>
-    {notice && <div className="toast-message" role="status"><span><Icon name="check" size={17} /></span>{notice}<button onClick={() => setNotice("")} aria-label="Dismiss message"><Icon name="close" size={15} /></button></div>}
   </>;
 }
