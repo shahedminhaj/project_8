@@ -315,8 +315,10 @@ h1, h2, h3, p { margin-top: 0; }
 .auth-submit { width: 100%; margin-top: 4px; }
 .auth-divider { display: flex; align-items: center; gap: 12px; margin: 17px 0 12px; color: var(--muted); font-size: 8px; }
 .auth-divider::before, .auth-divider::after { height: 1px; flex: 1; background: var(--line); content: ""; }
+.social-buttons { display: grid; gap: 8px; }
 .social-button { position: relative; width: 100%; min-height: 44px; }
 .google-mark { position: absolute; left: 14px; color: #4285f4; font-size: 15px; font-weight: 800; }
+.github-mark { position: absolute; left: 14px; color: var(--ink); font-size: 10px; font-weight: 800; }
 .auth-switch { margin-top: 21px; color: var(--muted); font-size: 10px; text-align: center; }
 .auth-switch a { margin-left: 3px; color: var(--green); font-weight: 700; }
 .auth-switch a:hover { text-decoration: underline; }

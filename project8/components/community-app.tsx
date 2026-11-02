@@ -17,6 +17,9 @@ type EventItem = {
 };
 
 type User = { name: string; email: string; photo: string };
+type SocialProvider = "google" | "github";
+type AuthUser = { name: string; email: string; image?: string | null };
+type SessionResponse = { user: AuthUser } | null;
 type View =
   | "home"
   | "events"
@@ -37,80 +40,43 @@ const photos = {
   people: "https://images.unsplash.com/photo-1469571486292-0ba58a3f068b?auto=format&fit=crop&w=900&q=80",
 };
 
-const initialEvents: EventItem[] = [
-  {
-    id: "warm-hands",
-    title: "Warm Hands, Warm Hearts",
-    description:
-      "Help us sort and share winter essentials with families who need a little extra warmth this season. Every donated coat and every helping hand makes a difference.",
-    category: "Donation",
-    location: "Mirpur 10, Dhaka",
-    date: "2027-01-03",
-    image: photos.food,
-    creatorEmail: "hello@commonplace.community",
-    creatorName: "Commonplace team",
-  },
-  {
-    id: "green-streets",
-    title: "A Greener Gulshan",
-    description:
-      "Spend a morning planting native trees and making our shared streets greener. Tools, seedlings, and a cup of tea are on us.",
-    category: "Plantation",
-    location: "Gulshan Lake Park, Dhaka",
-    date: "2027-01-05",
-    image: photos.garden,
-    creatorEmail: "hello@commonplace.community",
-    creatorName: "Commonplace team",
-  },
-  {
-    id: "clean-canal",
-    title: "Little Steps, Cleaner Canal",
-    description:
-      "Join neighbors for a hands-on cleanup along the canal. We will provide gloves, bags, and a short safety briefing before we get started.",
-    category: "Cleanup",
-    location: "Dhanmondi Lake, Dhaka",
-    date: "2027-01-08",
-    image: photos.cleanup,
-    creatorEmail: "hello@commonplace.community",
-    creatorName: "Commonplace team",
-  },
-  {
-    id: "shared-table",
-    title: "The Shared Table",
-    description:
-      "Cook, pack, and deliver nourishing meal boxes with a friendly crew. Bring your energy; we will take care of the ingredients.",
-    category: "Food drive",
-    location: "Mohammadpur, Dhaka",
-    date: "2027-01-11",
-    image: photos.people,
-    creatorEmail: "hello@commonplace.community",
-    creatorName: "Commonplace team",
-  },
-  {
-    id: "reading-circle",
-    title: "Stories for Every Saturday",
-    description:
-      "Share the joy of reading with local children through games, stories, and a book to take home. No teaching experience needed.",
-    category: "Education",
-    location: "Lalmatia, Dhaka",
-    date: "2027-01-14",
-    image: photos.children,
-    creatorEmail: "hello@commonplace.community",
-    creatorName: "Commonplace team",
-  },
-  {
-    id: "neighbors-day",
-    title: "A Day for Neighbors",
-    description:
-      "Meet the people who make our neighborhood feel like home. Lend a hand at our community day with activities for every age.",
-    category: "Community",
-    location: "Banani, Dhaka",
-    date: "2027-01-17",
-    image: photos.community,
-    creatorEmail: "hello@commonplace.community",
-    creatorName: "Commonplace team",
-  },
-];
+const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+
+async function apiRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const response = await fetch(`${apiBaseUrl}${path}`, {
+    ...options,
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+  const body = await response.text();
+  const payload: unknown = body ? JSON.parse(body) : undefined;
+
+  if (!response.ok) {
+    const message =
+      typeof payload === "object" &&
+      payload !== null &&
+      "message" in payload &&
+      typeof payload.message === "string"
+        ? payload.message
+        : "The request could not be completed.";
+    throw new Error(message);
+  }
+
+  return payload as T;
+}
+
+function toUser(user: AuthUser): User {
+  return {
+    name: user.name,
+    email: user.email,
+    photo:
+      user.image ||
+      `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(user.name || user.email)}`,
+  };
+}
 
 function futureDate(days: number) {
   const date = new Date();
@@ -281,7 +247,7 @@ function EventForm({
 
 export function CommunityApp({ view, eventId }: { view: View; eventId?: string }) {
   const router = useRouter();
-  const [events, setEvents] = useState<EventItem[]>(initialEvents);
+  const [events, setEvents] = useState<EventItem[]>([]);
   const [today, setToday] = useState("1970-01-01");
   const [minEventDate, setMinEventDate] = useState("1970-01-02");
   const [joined, setJoined] = useState<string[]>([]);
@@ -295,22 +261,39 @@ export function CommunityApp({ view, eventId }: { view: View; eventId?: string }
   const [editing, setEditing] = useState<EventItem | null>(null);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => {
-      const storedEvents = localStorage.getItem("commonplace-events");
-      const storedJoined = localStorage.getItem("commonplace-joined");
-      const storedUser = localStorage.getItem("commonplace-user");
+    let active = true;
+    async function loadAppData() {
       const storedTheme = localStorage.getItem("commonplace-theme");
       const date = new Date();
       setToday(date.toISOString().slice(0, 10));
       setMinEventDate(futureDate(1));
-      if (storedEvents) setEvents(JSON.parse(storedEvents) as EventItem[]);
-      else setEvents(initialEvents.map((event, index) => ({ ...event, date: futureDate([3, 5, 8, 11, 14, 17][index]) })));
-      if (storedJoined) setJoined(JSON.parse(storedJoined) as string[]);
-      if (storedUser) setUser(JSON.parse(storedUser) as User);
       if (storedTheme) setDark(storedTheme === "dark");
-      setReady(true);
-    }, 0);
-    return () => window.clearTimeout(timer);
+
+      try {
+        const [loadedEvents, session] = await Promise.all([
+          apiRequest<EventItem[]>("/api/events"),
+          apiRequest<SessionResponse>("/api/auth/get-session"),
+        ]);
+        if (!active) return;
+        setEvents(loadedEvents);
+        const currentUser = session?.user ? toUser(session.user) : null;
+        setUser(currentUser);
+        if (currentUser) {
+          setJoined(await apiRequest<string[]>("/api/events/joined"));
+        }
+      } catch (error) {
+        if (active) {
+          setNotice(error instanceof Error ? error.message : "Could not connect to the backend.");
+        }
+      } finally {
+        if (active) setReady(true);
+      }
+    }
+
+    void loadAppData();
+    return () => {
+      active = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -339,42 +322,53 @@ export function CommunityApp({ view, eventId }: { view: View; eventId?: string }
     .filter((event) => joined.includes(event.id))
     .sort((a, b) => a.date.localeCompare(b.date));
 
-  function saveEvents(next: EventItem[]) {
-    setEvents(next);
-    localStorage.setItem("commonplace-events", JSON.stringify(next));
-  }
-
-  function saveJoined(next: string[]) {
-    setJoined(next);
-    localStorage.setItem("commonplace-joined", JSON.stringify(next));
-  }
-
-  function addEvent(data: Omit<EventItem, "id" | "creatorEmail" | "creatorName">) {
+  async function addEvent(data: Omit<EventItem, "id" | "creatorEmail" | "creatorName">) {
     if (!user) {
       router.push("/login");
       return;
     }
-    const next = [{ ...data, id: `event-${Date.now()}`, creatorEmail: user.email, creatorName: user.name }, ...events];
-    saveEvents(next);
-    setNotice("Your event is on the calendar. Thanks for bringing people together!");
-    router.push("/events");
+    try {
+      const event = await apiRequest<EventItem>("/api/events", {
+        method: "POST",
+        body: JSON.stringify(data),
+      });
+      setEvents((current) => [event, ...current]);
+      setNotice("Your event is on the calendar. Thanks for bringing people together!");
+      router.push("/events");
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Could not create the event.");
+    }
   }
 
-  function updateEvent(data: Omit<EventItem, "id" | "creatorEmail" | "creatorName">) {
+  async function updateEvent(data: Omit<EventItem, "id" | "creatorEmail" | "creatorName">) {
     if (!editing || editing.creatorEmail !== user?.email) return;
-    saveEvents(events.map((event) => event.id === editing.id ? { ...event, ...data } : event));
-    setEditing(null);
-    setNotice("Your event details have been updated.");
+    try {
+      const updated = await apiRequest<EventItem>(`/api/events/${editing.id}`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      });
+      setEvents((current) => current.map((event) => event.id === updated.id ? updated : event));
+      setEditing(null);
+      setNotice("Your event details have been updated.");
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Could not update the event.");
+    }
   }
 
-  function deleteEvent(id: string) {
+  async function deleteEvent(id: string) {
     const event = events.find((item) => item.id === id);
     if (!event || event.creatorEmail !== user?.email) return;
-    saveEvents(events.filter((item) => item.id !== id));
-    setNotice("Event removed from your list.");
+    try {
+      await apiRequest<void>(`/api/events/${id}`, { method: "DELETE" });
+      setEvents((current) => current.filter((item) => item.id !== id));
+      setJoined((current) => current.filter((eventId) => eventId !== id));
+      setNotice("Event removed from your list.");
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Could not remove the event.");
+    }
   }
 
-  function joinEvent(id: string) {
+  async function joinEvent(id: string) {
     if (!user) {
       router.push("/login");
       return;
@@ -383,11 +377,16 @@ export function CommunityApp({ view, eventId }: { view: View; eventId?: string }
       setNotice("You’re already on the list for this event.");
       return;
     }
-    saveJoined([...joined, id]);
-    setNotice("You’re in! We’ll see you there.");
+    try {
+      await apiRequest(`/api/events/${id}/join`, { method: "POST" });
+      setJoined((current) => [...current, id]);
+      setNotice("You’re in! We’ll see you there.");
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Could not join the event.");
+    }
   }
 
-  function authenticate(event: FormEvent<HTMLFormElement>, registering: boolean) {
+  async function authenticate(event: FormEvent<HTMLFormElement>, registering: boolean) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     const email = String(form.get("email") || "").trim().toLowerCase();
@@ -401,31 +400,53 @@ export function CommunityApp({ view, eventId }: { view: View; eventId?: string }
       setNotice("Your password needs at least one uppercase and one lowercase letter.");
       return;
     }
-    const nextUser = {
-      name: name || email.split("@")[0],
-      email,
-      photo: String(form.get("photo") || "").trim() || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(name || email)}`,
-    };
-    setUser(nextUser);
-    localStorage.setItem("commonplace-user", JSON.stringify(nextUser));
-    setNotice(registering ? "Welcome to Commonplace. Your profile is ready!" : "Welcome back. Let’s do some good.");
-    router.push("/events");
+    const path = registering ? "/api/auth/sign-up/email" : "/api/auth/sign-in/email";
+    const credentials = registering
+      ? {
+          name,
+          email,
+          password,
+          image: String(form.get("photo") || "").trim() || undefined,
+        }
+      : { email, password };
+
+    try {
+      const result = await apiRequest<{ user: AuthUser }>(path, {
+        method: "POST",
+        body: JSON.stringify(credentials),
+      });
+      setUser(toUser(result.user));
+      setNotice(registering ? "Welcome to Commonplace. Your profile is ready!" : "Welcome back. Let’s do some good.");
+      router.push("/events");
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Could not authenticate your account.");
+    }
   }
 
-  function logout() {
-    localStorage.removeItem("commonplace-user");
-    setUser(null);
-    setMenuOpen(false);
-    setNotice("You’ve been signed out.");
-    router.push("/");
+  async function signInSocial(provider: SocialProvider) {
+    try {
+      const result = await apiRequest<{ url?: string }>("/api/auth/sign-in/social", {
+        method: "POST",
+        body: JSON.stringify({ provider, callbackURL: `${window.location.origin}/events` }),
+      });
+      if (!result.url) throw new Error(`The ${provider} sign-in provider did not return a URL.`);
+      window.location.assign(result.url);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : `Could not start ${provider} sign-in.`);
+    }
   }
 
-  function demoSocial() {
-    const nextUser = { name: "Good Neighbor", email: "neighbor@example.com", photo: "https://api.dicebear.com/7.x/initials/svg?seed=Good%20Neighbor" };
-    setUser(nextUser);
-    localStorage.setItem("commonplace-user", JSON.stringify(nextUser));
-    setNotice("Welcome to Commonplace. Your demo profile is ready!");
-    router.push("/events");
+  async function logout() {
+    try {
+      await apiRequest<void>("/api/auth/sign-out", { method: "POST" });
+      setUser(null);
+      setJoined([]);
+      setMenuOpen(false);
+      setNotice("You’ve been signed out.");
+      router.push("/");
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Could not sign out.");
+    }
   }
 
   return (
@@ -489,8 +510,8 @@ export function CommunityApp({ view, eventId }: { view: View; eventId?: string }
         {view === "joined" && <ProtectedPage user={user} ready={ready} title="Good things you’re part of." eyebrow="JOINED EVENTS" description="Your next small act of good is right around the corner." loginHref="/joined-events">
           {joinedEvents.length ? <div className="event-grid">{joinedEvents.map((event) => <EventCard key={event.id} event={event} />)}</div> : <EmptyState title="Your next good thing is out there." detail="Find a local event that feels right and we’ll save it here for you." action="Explore events" href="/events" />}
         </ProtectedPage>}
-        {view === "login" && <AuthPage registering={false} onSubmit={(event) => authenticate(event, false)} onDemo={demoSocial} />}
-        {view === "register" && <AuthPage registering onSubmit={(event) => authenticate(event, true)} onDemo={demoSocial} />}
+        {view === "login" && <AuthPage registering={false} onSubmit={(event) => void authenticate(event, false)} onSocial={signInSocial} />}
+        {view === "register" && <AuthPage registering onSubmit={(event) => void authenticate(event, true)} onSocial={signInSocial} />}
       </main>
 
       {view !== "login" && view !== "register" && <Footer />}
@@ -602,7 +623,7 @@ function EmptyState({ title, detail, action, href }: { title: string; detail: st
   return <div className="empty-state"><span><Icon name="leaf" size={25} /></span><h2>{title}</h2><p>{detail}</p><Link className="button button-primary" href={href}>{action}<Icon name="arrow" size={16} /></Link></div>;
 }
 
-function AuthPage({ registering, onSubmit, onDemo }: { registering: boolean; onSubmit: (event: FormEvent<HTMLFormElement>) => void; onDemo: () => void }) {
+function AuthPage({ registering, onSubmit, onSocial }: { registering: boolean; onSubmit: (event: FormEvent<HTMLFormElement>) => void; onSocial: (provider: SocialProvider) => void }) {
   return <section className="auth-page">
     <div className="auth-visual" style={pictureStyle(photos.people)}><div className="auth-visual-caption"><span className="eyebrow eyebrow-light">GOOD THINGS GROW HERE</span><h2>There’s a place<br />for you <em>here.</em></h2><p>Come as you are. Leave a little good behind.</p></div><div className="auth-caption-mark">✳</div></div>
     <div className="auth-panel"><div className="auth-card"><span className="eyebrow"><span className="eyebrow-line" /> {registering ? "COME ON IN" : "GOOD TO SEE YOU"}</span><h1>{registering ? <>Let’s get<br /><em>to know you.</em></> : <>Welcome<br /><em>back.</em></>}</h1><p>{registering ? "Make a little room for good things in your neighborhood." : "Your next good thing is right where you left it."}</p>
@@ -613,9 +634,15 @@ function AuthPage({ registering, onSubmit, onDemo }: { registering: boolean; onS
         <label className="form-field">Password<input name="password" type="password" required minLength={6} autoComplete={registering ? "new-password" : "current-password"} placeholder="At least 6 characters" />{registering && <small className="field-hint">Include an uppercase and a lowercase letter.</small>}</label>
         <button className="button button-primary button-large auth-submit" type="submit">{registering ? "Create your account" : "Log in"}<Icon name="arrow" size={17} /></button>
       </form>
-      {!registering && <><div className="auth-divider"><span>OR</span></div><button className="button button-outline social-button" type="button" onClick={onDemo}><span className="google-mark">G</span> Continue with Google</button></>}
+      {!registering && <>
+        <div className="auth-divider"><span>OR</span></div>
+        <div className="social-buttons">
+          <button className="button button-outline social-button" type="button" onClick={() => onSocial("google")}><span className="google-mark">G</span> Continue with Google</button>
+          <button className="button button-outline social-button" type="button" onClick={() => onSocial("github")}><span className="github-mark">GH</span> Continue with GitHub</button>
+        </div>
+      </>}
       <div className="auth-switch">{registering ? <>Already one of us? <Link href="/login">Log in</Link></> : <>New around here? <Link href="/register">Create an account</Link></>}</div>
-      <div className="auth-demo-note"><Icon name="spark" size={15} /> Frontend demo: your profile is saved in this browser.</div>
+      <div className="auth-demo-note"><Icon name="spark" size={15} /> Your account is secured by Commonplace.</div>
     </div></div>
   </section>;
 }
