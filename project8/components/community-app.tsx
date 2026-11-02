@@ -11,6 +11,7 @@ type EventItem = {
   category: string;
   location: string;
   date: string;
+  time: string;
   image: string;
   creatorEmail: string;
   creatorName: string;
@@ -117,6 +118,20 @@ function formatDate(value: string) {
   });
 }
 
+function formatTime(value?: string) {
+  if (!value) return "Time not set";
+  const [hours, minutes] = value.split(":").map(Number);
+  if (
+    !Number.isInteger(hours) ||
+    hours < 0 ||
+    hours > 23 ||
+    !Number.isInteger(minutes) ||
+    minutes < 0 ||
+    minutes > 59
+  ) return "Time not set";
+  return `${hours % 12 || 12}:${String(minutes).padStart(2, "0")} ${hours >= 12 ? "PM" : "AM"}`;
+}
+
 function Icon({
   name,
   size = 18,
@@ -178,7 +193,7 @@ function EventCard({
         <span className="image-arrow"><Icon name="arrow" size={16} /></span>
       </Link>
       <div className="event-card-content">
-        <div className="event-date"><Icon name="calendar" size={15} />{formatDate(event.date)}</div>
+        <div className="event-date"><Icon name="calendar" size={15} />{formatDate(event.date)} · {formatTime(event.time)}</div>
         <h3><Link href={`/events/${event.id}`}>{event.title}</Link></h3>
         <p className="event-location"><Icon name="pin" size={15} />{event.location}</p>
         {!compact && <p className="event-description">{event.description}</p>}
@@ -209,8 +224,13 @@ function EventForm({
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     const date = String(form.get("date") || "");
+    const time = String(form.get("time") || "");
     if (!date || date <= new Date().toISOString().slice(0, 10)) {
       setError("Choose a date in the future so everyone has time to join.");
+      return;
+    }
+    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) {
+      setError("Choose a valid event time.");
       return;
     }
     const thumbnail = String(form.get("image") || "").trim();
@@ -225,6 +245,7 @@ function EventForm({
       category: String(form.get("category") || ""),
       location: String(form.get("location") || "").trim(),
       date,
+      time,
       image: thumbnail || photos.community,
     });
   }
@@ -247,6 +268,10 @@ function EventForm({
         <label className="form-field">
           Event date
           <input name="date" type="date" required min={minDate} defaultValue={initial?.date} />
+        </label>
+        <label className="form-field">
+          Event time
+          <input name="time" type="time" required defaultValue={initial?.time || ""} />
         </label>
         <label className="form-field form-span">
           Location
@@ -384,6 +409,7 @@ export function CommunityApp({ view, eventId }: { view: View; eventId?: string }
   async function deleteEvent(id: string) {
     const event = events.find((item) => item.id === id);
     if (!event || event.creatorEmail !== user?.email) return;
+    if (!window.confirm(`Delete "${event.title}"? This cannot be undone.`)) return;
     try {
       await apiRequest<void>(`/api/events/${id}`, { method: "DELETE" });
       setEvents((current) => current.filter((item) => item.id !== id));
@@ -496,6 +522,7 @@ export function CommunityApp({ view, eventId }: { view: View; eventId?: string }
           <nav className={`main-nav${menuOpen ? " nav-open" : ""}`} aria-label="Main navigation">
             <Link className={view === "home" ? "nav-active" : ""} href="/" onClick={() => setMenuOpen(false)}>Home</Link>
             <Link className={view === "events" || view === "details" ? "nav-active" : ""} href="/events" onClick={() => setMenuOpen(false)}>Upcoming events</Link>
+            {user && <Link className={view === "manage" ? "nav-active" : ""} href="/manage-events" onClick={() => setMenuOpen(false)}>Manage events</Link>}
             <Link href="/#our-way" onClick={() => setMenuOpen(false)}>Our way</Link>
           </nav>
           <div className="nav-actions">
@@ -526,8 +553,8 @@ export function CommunityApp({ view, eventId }: { view: View; eventId?: string }
         {view === "manage" && <ProtectedPage user={user} ready={ready} title="Your events, all together." eyebrow="MANAGE EVENTS" description="Keep your plans current and your community in the loop." loginHref="/manage-events">
           {ownEvents.length ? <div className="manage-list">{ownEvents.map((event) => <div className="manage-item" key={event.id}>
             <div className="manage-thumb" style={pictureStyle(event.image)} />
-            <div className="manage-info"><span>{event.category} · {formatDate(event.date)}</span><h3>{event.title}</h3><p><Icon name="pin" size={14} />{event.location}</p></div>
-            <div className="manage-actions"><button className="button button-outline button-small" onClick={() => setEditing(event)}>Edit</button><button className="button button-delete button-small" onClick={() => deleteEvent(event.id)}>Delete</button></div>
+            <div className="manage-info"><span>{event.category} · {formatDate(event.date)} · {formatTime(event.time)}</span><h3>{event.title}</h3><p><Icon name="pin" size={14} />{event.location}</p></div>
+            <div className="manage-actions"><button className="button button-outline button-small" onClick={() => setEditing(event)}>Edit date &amp; time</button><button className="button button-delete button-small" onClick={() => deleteEvent(event.id)}>Delete</button></div>
           </div>)}</div> : <EmptyState title="Your calendar is still open." detail="Create an event and invite your neighbors to make a difference together." action="Create an event" href="/create-event" />}
           {editing && <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setEditing(null); }}>
             <section className="edit-modal" role="dialog" aria-modal="true" aria-labelledby="edit-title">
@@ -620,7 +647,7 @@ function DetailsPage({ event, user, joined, onJoin }: { event?: EventItem; user:
   return <section className="interior-page page-width detail-page">
     <Link className="back-link" href="/events">← Back to upcoming events</Link>
     <div className="detail-layout"><div><div className="detail-image" style={pictureStyle(event.image)}><span className="category-tag">{event.category}</span></div><div className="detail-story"><span className="eyebrow"><span className="eyebrow-line" /> A NEIGHBORHOOD EVENT</span><h1>{event.title}</h1><p>{event.description}</p><p className="detail-host">Organized by <strong>{event.creatorName}</strong></p></div></div>
-      <aside className="detail-sidebar"><span className="eyebrow">SAVE YOUR SPOT</span><h2>Let’s make it<br /><em>happen.</em></h2><div className="detail-fact"><span><Icon name="calendar" size={17} /></span><div><small>WHEN</small><strong>{formatDate(event.date)}</strong></div></div><div className="detail-fact"><span><Icon name="pin" size={17} /></span><div><small>WHERE</small><strong>{event.location}</strong></div></div><button className="button button-primary button-large join-button" onClick={onJoin}>{joined ? <>You’re on the list <Icon name="check" size={17} /></> : <>Count me in <Icon name="arrow" size={17} /></>}</button>{!user && <p className="join-hint">You’ll need to <Link href="/login">log in</Link> to join.</p>}<div className="sidebar-note"><Icon name="heart" size={17} /><span>Every person who shows up makes a difference.</span></div></aside>
+      <aside className="detail-sidebar"><span className="eyebrow">SAVE YOUR SPOT</span><h2>Let’s make it<br /><em>happen.</em></h2><div className="detail-fact"><span><Icon name="calendar" size={17} /></span><div><small>WHEN</small><strong>{formatDate(event.date)} · {formatTime(event.time)}</strong></div></div><div className="detail-fact"><span><Icon name="pin" size={17} /></span><div><small>WHERE</small><strong>{event.location}</strong></div></div><button className="button button-primary button-large join-button" onClick={onJoin}>{joined ? <>You’re on the list <Icon name="check" size={17} /></> : <>Count me in <Icon name="arrow" size={17} /></>}</button>{!user && <p className="join-hint">You’ll need to <Link href="/login">log in</Link> to join.</p>}<div className="sidebar-note"><Icon name="heart" size={17} /><span>Every person who shows up makes a difference.</span></div></aside>
     </div>
   </section>;
 }
