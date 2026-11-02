@@ -1,0 +1,12 @@
+{
+  "name": "commonplace-community-platform",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "npm --prefix project8 run dev",
+    "build": "npm --prefix project8 run build",
+    "start": "npm --prefix project8 run start",
+    "lint": "npm --prefix project8 run lint",
+    "install:app": "npm --prefix project8 install"
+  }
+}
