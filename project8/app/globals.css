@@ -211,7 +211,7 @@ h1, h2, h3, p { margin-top: 0; }
 .impact-inner { min-height: 106px; display: flex; align-items: center; justify-content: space-between; gap: 20px; }
 .impact-inner > p { align-self: flex-start; margin: 31px 25px 0 0; color: var(--muted-foreground); font-size: 8px; font-weight: 700; letter-spacing: .13em; }
 .impact-inner > div { display: flex; flex-direction: column; gap: 4px; padding-left: 27px; border-left: 1px solid rgba(54, 88, 65, .19); }
-.impact-inner strong { font-family: Georgia, serif; font-size: 21px; font-weight: 400; letter-spacing: -.04em; }
+.impact-inner strong { font-family: Georgia, serif; font-size: 29px; font-weight: 400; letter-spacing: -.04em; }
 .impact-inner span { color: var(--muted-foreground); font-size: 10px; }
 
 .section-block { padding-top: 92px; padding-bottom: 91px; }
@@ -425,7 +425,7 @@ h1, h2, h3, p { margin-top: 0; }
   .impact-inner { gap: 12px; }
   .impact-inner > p { max-width: 105px; margin-right: 5px; line-height: 1.6; }
   .impact-inner > div { padding-left: 15px; }
-  .impact-inner strong { font-size: 18px; }
+  .impact-inner strong { font-size: 23px; }
   .event-grid { gap: 14px; }
   .event-card-image { height: 160px; }
   .event-card-content { padding: 15px; }
@@ -475,7 +475,7 @@ h1, h2, h3, p { margin-top: 0; }
   .impact-inner { min-height: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 16px 10px; padding-top: 20px; padding-bottom: 20px; }
   .impact-inner > p { grid-column: 1 / -1; max-width: none; margin: 0; }
   .impact-inner > div { padding-left: 13px; }
-  .impact-inner strong { font-size: 17px; }
+  .impact-inner strong { font-size: 21px; }
   .impact-inner span { font-size: 9px; }
   .section-block { padding-top: 64px; padding-bottom: 62px; }
   .section-heading { align-items: flex-end; margin-bottom: 21px; }

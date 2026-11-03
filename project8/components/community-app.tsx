@@ -411,6 +411,10 @@ export function CommunityApp({ view, eventId }: { view: View; eventId?: string }
       .filter((event) => `${event.title} ${event.location} ${event.category}`.toLowerCase().includes(search.toLowerCase()))
       .sort((a, b) => a.date.localeCompare(b.date));
   }, [events, today, category, search]);
+  const upcomingEvents = useMemo(
+    () => events.filter((event) => event.date >= today),
+    [events, today],
+  );
 
   const activeEvent = events.find((event) => event.id === eventId);
   const ownEvents = events.filter((event) => event.creatorEmail === user?.email);
@@ -602,7 +606,7 @@ export function CommunityApp({ view, eventId }: { view: View; eventId?: string }
       </header>
 
       <main>
-        {view === "home" && <HomePage events={visibleEvents.slice(0, 6)} />}
+        {view === "home" && <HomePage events={visibleEvents.slice(0, 6)} statisticsEvents={upcomingEvents} />}
         {view === "events" && <EventsPage events={visibleEvents} search={search} setSearch={setSearch} category={category} setCategory={setCategory} />}
         {view === "details" && <DetailsPage event={activeEvent} user={user} joined={joined.includes(eventId || "")} onJoin={() => eventId && joinEvent(eventId)} />}
         {view === "create" && <ProtectedPage user={user} ready={ready} title="Make something good happen." eyebrow="CREATE AN EVENT" description="You bring the idea. We’ll help you bring your neighbors together." loginHref="/create-event"><EventForm minDate={minEventDate} submitLabel="Publish your event" onSubmit={addEvent} /></ProtectedPage>}
@@ -635,7 +639,10 @@ export function CommunityApp({ view, eventId }: { view: View; eventId?: string }
   );
 }
 
-function HomePage({ events }: { events: EventItem[] }) {
+function HomePage({ events, statisticsEvents }: { events: EventItem[]; statisticsEvents: EventItem[] }) {
+  const eventTypes = new Set(statisticsEvents.map((event) => event.category)).size;
+  const eventLocations = new Set(statisticsEvents.map((event) => event.location)).size;
+
   return <>
     <section className="hero-section page-width">
       <div className="hero-copy">
@@ -655,7 +662,12 @@ function HomePage({ events }: { events: EventItem[] }) {
     </section>
 
     <section className="impact-strip">
-      <div className="page-width impact-inner"><p>GOOD THINGS HAPPEN WHEN WE</p><div><strong>show up</strong><span>for each other</span></div><div><strong>pitch in</strong><span>where it matters</span></div><div><strong>grow together</strong><span>one neighborhood at a time</span></div></div>
+      <div className="page-width impact-inner">
+        <p>THE NEIGHBORHOOD<br />AT A GLANCE</p>
+        <div><strong>{statisticsEvents.length}</strong><span>upcoming events</span></div>
+        <div><strong>{eventTypes}</strong><span>ways to pitch in</span></div>
+        <div><strong>{eventLocations}</strong><span>places to show up</span></div>
+      </div>
     </section>
 
     <section className="section-block page-width" id="our-way">
