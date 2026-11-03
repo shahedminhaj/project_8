@@ -342,6 +342,22 @@ h1, h2, h3, p { margin-top: 0; }
 .workspace-heading h1 { max-width: 730px; margin: 15px 0 9px; font-family: Georgia, serif; font-size: clamp(40px, 5vw, 58px); font-weight: 400; letter-spacing: -.055em; line-height: 1.02; }
 .workspace-heading p { max-width: 475px; margin: 0; color: var(--muted-foreground); font-size: 12px; line-height: 1.7; }
 .workspace-content { padding-top: 30px; }
+.profile-card { max-width: 720px; padding: 27px; border: 1px solid var(--line); border-radius: 16px; background: var(--card); box-shadow: 0 8px 24px rgba(31, 48, 37, .04); }
+.profile-card-content { display: flex; align-items: flex-start; gap: 21px; }
+.profile-avatar { width: 72px; height: 72px; flex: 0 0 auto; border: 2px solid var(--line); background: var(--green-soft); color: var(--green); }
+.profile-details { min-width: 0; flex: 1; }
+.profile-name { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.profile-field-label { color: var(--muted-foreground); font-size: 10px; font-weight: 600; }
+.profile-details h2 { margin: 8px 0 4px; font-family: Georgia, serif; font-size: 27px; font-weight: 400; }
+.profile-details > p { overflow-wrap: anywhere; margin: 0; color: var(--muted-foreground); font-size: 12px; }
+.profile-name-form { max-width: 420px; margin-top: 12px; }
+.profile-name-form .form-field { gap: 7px; }
+.profile-name-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+.profile-name-actions .button, .profile-change-name { min-height: 36px; padding-inline: 12px; font-size: 10px; }
+.profile-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 22px; }
+.profile-stats > div { min-height: 92px; display: flex; flex-direction: column; justify-content: center; gap: 5px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--green-soft); }
+.profile-stats strong { font-family: Georgia, serif; font-size: 23px; font-weight: 400; }
+.profile-stats span { color: var(--muted-foreground); font-size: 10px; }
 .event-form { max-width: 720px; padding: 27px; border: 1px solid var(--line); border-radius: 16px; background: var(--card); box-shadow: 0 8px 24px rgba(31, 48, 37, .04); }
 .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 17px 19px; }
 .form-field { display: flex; flex-direction: column; align-items: stretch; gap: 8px; color: var(--ink); font-size: 11px; font-weight: 650; }
@@ -518,6 +534,13 @@ h1, h2, h3, p { margin-top: 0; }
   .footer-bottom span:nth-child(2) { display: none; }
   .footer-bottom a { margin-left: auto; }
   .interior-page { min-height: 520px; padding-top: 45px; padding-bottom: 60px; }
+  .profile-card { padding: 19px; }
+  .profile-card-content { gap: 14px; }
+  .profile-avatar { width: 56px; height: 56px; }
+  .profile-name { align-items: flex-start; flex-direction: column; gap: 8px; }
+  .profile-details h2 { font-size: 23px; }
+  .profile-stats { gap: 8px; margin-top: 17px; }
+  .profile-stats > div { min-height: 76px; padding: 11px; }
   .interior-intro { padding-bottom: 23px; }
   .interior-intro h1 { margin: 17px 0 10px; font-size: 53px; }
   .interior-intro > p { max-width: 310px; font-size: 11px; }

@@ -77,6 +77,7 @@ type View =
   | "create"
   | "manage"
   | "joined"
+  | "profile"
   | "login"
   | "register";
 
@@ -488,6 +489,23 @@ export function CommunityApp({ view, eventId }: { view: View; eventId?: string }
     }
   }
 
+  async function changeProfileName(name: string): Promise<boolean> {
+    try {
+      await apiRequest<void>("/api/auth/update-user", {
+        method: "POST",
+        body: JSON.stringify({ name }),
+      });
+      const session = await apiRequest<SessionResponse>("/api/auth/get-session");
+      if (!session?.user) throw new Error("Could not load your updated profile. Please try again.");
+      setUser(toUser(session.user));
+      setNotice("Your name has been updated.");
+      return true;
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Could not update your name.");
+      return false;
+    }
+  }
+
   async function authenticate(event: FormEvent<HTMLFormElement>, registering: boolean) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
@@ -596,6 +614,7 @@ export function CommunityApp({ view, eventId }: { view: View; eventId?: string }
                       </DropdownMenuLabel>
                     </DropdownMenuGroup>
                     <DropdownMenuSeparator />
+                    <DropdownMenuItem render={<Link href="/profile" />}>Profile</DropdownMenuItem>
                     <DropdownMenuItem render={<Link href="/create-event" />}>Create event</DropdownMenuItem>
                     <DropdownMenuItem render={<Link href="/manage-events" />}>Manage events</DropdownMenuItem>
                     <DropdownMenuItem render={<Link href="/joined-events" />}>Joined events</DropdownMenuItem>
@@ -631,6 +650,9 @@ export function CommunityApp({ view, eventId }: { view: View; eventId?: string }
         </ProtectedPage>}
         {view === "joined" && <ProtectedPage user={user} ready={ready} title="Good things you’re part of." eyebrow="JOINED EVENTS" description="Your next small act of good is right around the corner." loginHref="/joined-events">
           {joinedEvents.length ? <div className="event-grid">{joinedEvents.map((event) => <EventCard key={event.id} event={event} />)}</div> : <EmptyState title="Your next good thing is out there." detail="Find a local event that feels right and we’ll save it here for you." action="Explore events" href="/events" />}
+        </ProtectedPage>}
+        {view === "profile" && <ProtectedPage user={user} ready={ready} title="Your neighborhood profile." eyebrow="YOUR PROFILE" description="Your Commonplace account, all in one place." loginHref="/profile">
+          {user && <ProfilePage user={user} createdEvents={ownEvents.length} joinedEvents={joinedEvents.length} onSaveName={changeProfileName} />}
         </ProtectedPage>}
         {view === "login" && <AuthPage registering={false} onSubmit={(event) => void authenticate(event, false)} onSocial={signInSocial} />}
         {view === "register" && <AuthPage registering onSubmit={(event) => void authenticate(event, true)} onSocial={signInSocial} />}
@@ -746,6 +768,67 @@ function EmptyState({ title, detail, action, href }: { title: string; detail: st
   return <Card className="empty-state"><span><Icon name="leaf" size={25} /></span><h2>{title}</h2><p>{detail}</p><Button nativeButton={false} render={<Link href={href} />} className="button button-primary">{action}<Icon name="arrow" size={16} /></Button></Card>;
 }
 
+function ProfilePage({
+  user,
+  createdEvents,
+  joinedEvents,
+  onSaveName,
+}: {
+  user: User;
+  createdEvents: number;
+  joinedEvents: number;
+  onSaveName: (name: string) => Promise<boolean>;
+}) {
+  const [editingName, setEditingName] = useState(false);
+  const [savingName, setSavingName] = useState(false);
+
+  async function submitName(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    const name = String(formData.get("name") || "").trim();
+    if (name.length < 2) return;
+
+    setSavingName(true);
+    const saved = await onSaveName(name);
+    setSavingName(false);
+    if (saved) setEditingName(false);
+  }
+
+  return <Card className="profile-card">
+    <CardContent className="profile-card-content">
+      <Avatar className="profile-avatar">
+        <AvatarImage src={user.photo} alt="" />
+        <AvatarFallback>{user.name.slice(0, 1).toUpperCase()}</AvatarFallback>
+      </Avatar>
+      <div className="profile-details">
+        <span className="eyebrow">ACCOUNT DETAILS</span>
+        {editingName ? (
+          <form className="profile-name-form" onSubmit={(event) => void submitName(event)}>
+            <Label className="form-field">
+              Name
+              <Input name="name" required minLength={2} maxLength={60} defaultValue={user.name} autoFocus />
+            </Label>
+            <div className="profile-name-actions">
+              <Button variant="outline" className="button button-outline" type="button" onClick={() => setEditingName(false)} disabled={savingName}>Cancel</Button>
+              <Button className="button button-primary" type="submit" disabled={savingName}>{savingName ? "Saving..." : "Save name"}</Button>
+            </div>
+          </form>
+        ) : (
+          <div className="profile-name">
+            <div><span className="profile-field-label">Name</span><h2>{user.name}</h2></div>
+            <Button variant="outline" className="button button-outline profile-change-name" type="button" onClick={() => setEditingName(true)}>Change name</Button>
+          </div>
+        )}
+        <p>{user.email}</p>
+        <div className="profile-stats">
+          <div><strong>{createdEvents}</strong><span>events created</span></div>
+          <div><strong>{joinedEvents}</strong><span>events joined</span></div>
+        </div>
+      </div>
+    </CardContent>
+  </Card>;
+}
+
 function AuthPage({ registering, onSubmit, onSocial }: { registering: boolean; onSubmit: (event: FormEvent<HTMLFormElement>) => void; onSocial: (provider: SocialProvider) => void }) {
   return <section className="auth-page">
     <div className="auth-visual" style={pictureStyle(photos.people)}><div className="auth-visual-caption"><span className="eyebrow eyebrow-light">GOOD THINGS GROW HERE</span><h2>There’s a place<br />for you <em>here.</em></h2><p>Come as you are. Leave a little good behind.</p></div><div className="auth-caption-mark">✳</div></div>
@@ -775,7 +858,6 @@ function Footer() {
 
   return <>
     <footer className="site-footer"><div className="page-width">
-      <div className="footer-main"><div className="footer-brand"><Link className="brand brand-footer" href="/"><span className="brand-mark"><Icon name="leaf" size={20} /></span><span>commonplace<span className="brand-period">.</span><small>GOOD THINGS GROW HERE</small></span></Link><p>Making it easier to show up<br />for the places we call home.</p></div><div className="footer-links"><div><span>FIND YOUR GOOD</span><Link href="/events">Upcoming events</Link><Link href="/create-event">Create an event</Link><Link href="/joined-events">Joined events</Link></div><div><span>THE NEIGHBORHOOD</span><a href="mailto:hello@commonplace.community">Say hello</a><a href="https://x.com" target="_blank" rel="noreferrer">Follow along on X ↗</a></div></div><div className="footer-sticker"><span>✳</span><p>Be the reason<br />someone smiles<br />this week.</p></div></div>
       <section className="footer-subscribe" aria-labelledby="footer-subscribe-title">
         <div>
           <span className="footer-subscribe-eyebrow">A LITTLE GOOD IN YOUR INBOX</span>
@@ -802,6 +884,7 @@ function Footer() {
           </form>
         )}
       </section>
+      <div className="footer-main"><div className="footer-brand"><Link className="brand brand-footer" href="/"><span className="brand-mark"><Icon name="leaf" size={20} /></span><span>commonplace<span className="brand-period">.</span><small>GOOD THINGS GROW HERE</small></span></Link><p>Making it easier to show up<br />for the places we call home.</p></div><div className="footer-links"><div><span>FIND YOUR GOOD</span><Link href="/events">Upcoming events</Link><Link href="/create-event">Create an event</Link><Link href="/joined-events">Joined events</Link></div><div><span>THE NEIGHBORHOOD</span><a href="mailto:hello@commonplace.community">Say hello</a><a href="https://x.com" target="_blank" rel="noreferrer">Follow along on X ↗</a></div></div><div className="footer-sticker"><span>✳</span><p>Be the reason<br />someone smiles<br />this week.</p></div></div>
       <div className="footer-bottom"><span>© Commonplace. Made for the good of it.</span><span>GOOD IS CLOSER THAN YOU THINK.</span><Link href="/">Back to top ↑</Link></div>
     </div></footer>
   </>;
