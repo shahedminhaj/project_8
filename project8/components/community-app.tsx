@@ -34,6 +34,7 @@ import {
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -589,9 +590,11 @@ export function CommunityApp({ view, eventId }: { view: View; eventId?: string }
                     </Avatar>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="account-dropdown">
-                    <DropdownMenuLabel className="account-dropdown-label">
-                      <strong>{user.name}</strong><span>{user.email}</span>
-                    </DropdownMenuLabel>
+                    <DropdownMenuGroup>
+                      <DropdownMenuLabel className="account-dropdown-label">
+                        <strong>{user.name}</strong><span>{user.email}</span>
+                      </DropdownMenuLabel>
+                    </DropdownMenuGroup>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem render={<Link href="/create-event" />}>Create event</DropdownMenuItem>
                     <DropdownMenuItem render={<Link href="/manage-events" />}>Manage events</DropdownMenuItem>
