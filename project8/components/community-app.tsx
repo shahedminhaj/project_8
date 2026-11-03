@@ -756,9 +756,37 @@ function AuthPage({ registering, onSubmit, onSocial }: { registering: boolean; o
 }
 
 function Footer() {
+  const [subscribed, setSubscribed] = useState(false);
+
   return <>
     <footer className="site-footer"><div className="page-width">
       <div className="footer-main"><div className="footer-brand"><Link className="brand brand-footer" href="/"><span className="brand-mark"><Icon name="leaf" size={20} /></span><span>commonplace<span className="brand-period">.</span><small>GOOD THINGS GROW HERE</small></span></Link><p>Making it easier to show up<br />for the places we call home.</p></div><div className="footer-links"><div><span>FIND YOUR GOOD</span><Link href="/events">Upcoming events</Link><Link href="/create-event">Create an event</Link><Link href="/joined-events">Joined events</Link></div><div><span>THE NEIGHBORHOOD</span><a href="mailto:hello@commonplace.community">Say hello</a><a href="https://x.com" target="_blank" rel="noreferrer">Follow along on X ↗</a></div></div><div className="footer-sticker"><span>✳</span><p>Be the reason<br />someone smiles<br />this week.</p></div></div>
+      <section className="footer-subscribe" aria-labelledby="footer-subscribe-title">
+        <div>
+          <span className="footer-subscribe-eyebrow">A LITTLE GOOD IN YOUR INBOX</span>
+          <h2 id="footer-subscribe-title">Stay in the neighborhood.</h2>
+          <p>Get a note when good things are happening nearby.</p>
+        </div>
+        {subscribed ? (
+          <p className="footer-subscribe-success" role="status">
+            <Icon name="check" size={17} /> Thanks for subscribing! You’ll be notified about good things happening nearby.
+          </p>
+        ) : (
+          <form
+            className="footer-subscribe-form"
+            onSubmit={(event) => {
+              event.preventDefault();
+              setSubscribed(true);
+            }}
+          >
+            <label htmlFor="footer-subscribe-email">Email address</label>
+            <div className="footer-subscribe-controls">
+              <Input id="footer-subscribe-email" name="email" type="email" required autoComplete="email" placeholder="you@example.com" />
+              <Button className="button button-primary" type="submit">Subscribe <Icon name="arrow" size={15} /></Button>
+            </div>
+          </form>
+        )}
+      </section>
       <div className="footer-bottom"><span>© Commonplace. Made for the good of it.</span><span>GOOD IS CLOSER THAN YOU THINK.</span><Link href="/">Back to top ↑</Link></div>
     </div></footer>
   </>;
