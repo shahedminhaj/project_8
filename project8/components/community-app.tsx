@@ -548,7 +548,11 @@ export function CommunityApp({ view, eventId }: { view: View; eventId?: string }
     try {
       const result = await apiRequest<{ url?: string }>("/api/auth/sign-in/social", {
         method: "POST",
-        body: JSON.stringify({ provider, callbackURL: `${window.location.origin}/events` }),
+        body: JSON.stringify({
+          provider,
+          callbackURL: new URL("/events", window.location.origin).toString(),
+          errorCallbackURL: new URL("/login", window.location.origin).toString(),
+        }),
       });
       if (!result.url) throw new Error(`The ${provider} sign-in provider did not return a URL.`);
       window.location.assign(result.url);
