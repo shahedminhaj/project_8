@@ -170,15 +170,10 @@ function formatDate(value: string) {
 
 function formatTime(value?: string) {
   if (!value) return "Time not set";
-  const [hours, minutes] = value.split(":").map(Number);
-  if (
-    !Number.isInteger(hours) ||
-    hours < 0 ||
-    hours > 23 ||
-    !Number.isInteger(minutes) ||
-    minutes < 0 ||
-    minutes > 59
-  ) return "Time not set";
+  const match = /^(?:\d{4}-\d{2}-\d{2}T)?([01]\d|2[0-3]):([0-5]\d)(?::[0-5]\d(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})?$/.exec(value);
+  if (!match) return "Time not set";
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
   return `${hours % 12 || 12}:${String(minutes).padStart(2, "0")} ${hours >= 12 ? "PM" : "AM"}`;
 }
 
