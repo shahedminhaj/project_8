@@ -2,8 +2,8 @@
 
 **Good things grow here.** Commonplace is a responsive community-events frontend for discovering local volunteer opportunities and bringing neighbors together.
 
-**Live site URL:** [Local preview](http://localhost:3000)  
-**Status:** Frontend prototype; connect an API and authentication provider before production deployment.
+**Live site URL:** https://project-8-mu.vercel.app/ 
+**Backend repository:** https://github.com/shahedminhaj/project_8_backend
 
 ## What you can do
 
@@ -24,6 +24,4 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
-## Notes
 
-This repository contains the frontend only. Account state is a browser-based demo, not secure authentication; event data is not shared across browsers. A production release needs a backend, persistent database, and server-verified authorization/JWT handling.
